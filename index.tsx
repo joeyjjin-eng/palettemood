@@ -17,7 +17,7 @@ import htm from 'htm';
 import {GoogleGenAI, Type} from '@google/genai';
 
 const html = htm.bind(h);
-const API_KEY = process.env.API_KEY;
+const API_KEY = import.meta.env.VITE_API_KEY;
 
 // --- 🚨 IMPORTANT ACTION REQUIRED 🚨 ---
 // You must get your own Google Client ID and add it here.
