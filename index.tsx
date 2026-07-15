@@ -52,6 +52,14 @@ interface HistoryItem {
   timestamp: string;
 }
 
+interface LikedColor {
+  id: number;
+  hex: string;
+  name: string;
+  imageSrc: string; // Base64 thumbnail of the source image
+  timestamp: string;
+}
+
 // --- Constants for Rate Limiting and Expiration ---
 const MAX_ITEMS_PER_DAY = 10;
 const EXPIRATION_HOURS = 72; // 3 days
@@ -423,7 +431,30 @@ const ImageUploader = ({
   `;
 };
 
-const ColorSwatch = ({color}: {color: Color}) => {
+const HeartIcon = ({filled}: {filled: boolean}) => html`
+  <svg
+    viewBox="0 0 24 24"
+    fill=${filled ? 'currentColor' : 'none'}
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path
+      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+    />
+  </svg>
+`;
+
+const ColorSwatch = ({
+  color,
+  isLiked,
+  onToggleLike,
+}: {
+  color: Color;
+  isLiked?: boolean;
+  onToggleLike?: (color: Color) => void;
+}) => {
   const tooltipRef = useRef<HTMLSpanElement>(null);
 
   const copyToClipboard = (text: string) => {
@@ -436,8 +467,24 @@ const ColorSwatch = ({color}: {color: Color}) => {
     });
   };
 
+  const handleLikeClick = (e: h.JSX.TargetedMouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    onToggleLike?.(color);
+  };
+
   return html`
     <div class="color-swatch">
+      ${onToggleLike &&
+      html`
+        <button
+          class=${'like-button ' + (isLiked ? 'liked' : '')}
+          onClick=${handleLikeClick}
+          aria-label=${isLiked ? 'Unlike color' : 'Like color'}
+          title=${isLiked ? 'Remove from liked' : 'Add to liked'}
+        >
+          <${HeartIcon} filled=${!!isLiked} />
+        </button>
+      `}
       <div
         class="color-display"
         style=${{backgroundColor: color.hex}}
@@ -468,7 +515,15 @@ const Loader = ({message}: {message: string}) => {
   `;
 };
 
-const PaletteDisplay = ({colors}: {colors: TieredColors}) => {
+const PaletteDisplay = ({
+  colors,
+  likedHexes,
+  onToggleLike,
+}: {
+  colors: TieredColors;
+  likedHexes?: Set<string>;
+  onToggleLike?: (color: Color) => void;
+}) => {
   const combinedColors = [...colors.secondary, ...colors.accent];
 
   return html`
@@ -477,7 +532,11 @@ const PaletteDisplay = ({colors}: {colors: TieredColors}) => {
         <h2>Primary Colors</h2>
         <div class="color-palette">
           ${colors.primary.map(
-            (color) => html`<${ColorSwatch} color=${color} />`,
+            (color) => html`<${ColorSwatch}
+              color=${color}
+              isLiked=${likedHexes?.has(color.hex)}
+              onToggleLike=${onToggleLike}
+            />`,
           )}
         </div>
       </div>
@@ -485,7 +544,11 @@ const PaletteDisplay = ({colors}: {colors: TieredColors}) => {
         <h2>Secondary + Accent</h2>
         <div class="color-palette">
           ${combinedColors.map(
-            (color) => html`<${ColorSwatch} color=${color} />`,
+            (color) => html`<${ColorSwatch}
+              color=${color}
+              isLiked=${likedHexes?.has(color.hex)}
+              onToggleLike=${onToggleLike}
+            />`,
           )}
         </div>
       </div>
@@ -562,6 +625,61 @@ const HistoryItemCard = ({
   `;
 };
 
+const LikedColorCard = ({
+  item,
+  onUnlike,
+}: {
+  item: LikedColor;
+  onUnlike: (id: number) => void;
+}) => {
+  const tooltipRef = useRef<HTMLSpanElement>(null);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      const tooltip = tooltipRef.current;
+      if (tooltip) {
+        tooltip.classList.add('visible');
+        setTimeout(() => tooltip.classList.remove('visible'), 1500);
+      }
+    });
+  };
+
+  return html`
+    <div class="liked-item-card">
+      <button
+        class="like-button liked"
+        onClick=${() => onUnlike(item.id)}
+        aria-label="Remove from liked"
+        title="Remove from liked"
+      >
+        <${HeartIcon} filled=${true} />
+      </button>
+      <img
+        src=${item.imageSrc}
+        alt="Source image"
+        class="liked-item-thumbnail"
+      />
+      <div
+        class="liked-item-color"
+        style=${{backgroundColor: item.hex}}
+      ></div>
+      <div class="liked-item-info">
+        <p class="liked-item-name">${item.name}</p>
+        <button
+          class="color-hex"
+          onClick=${() => copyToClipboard(item.hex)}
+          aria-label="Copy color code ${item.hex}"
+        >
+          ${item.hex}
+          <span ref=${tooltipRef} class="copy-tooltip" aria-live="polite"
+            >Copied!</span
+          >
+        </button>
+      </div>
+    </div>
+  `;
+};
+
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -569,10 +687,18 @@ const App = () => {
   const [tieredColors, setTieredColors] = useState<TieredColors | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [likedColors, setLikedColors] = useState<LikedColor[]>([]);
   const [showConfigError, setShowConfigError] = useState(false);
-  const resultsRef = useRef<HTMLDivElement>(null); 
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const isResultVisible = !!(imagePreview && (tieredColors || loadingMessage));
+
+  // Hex codes that are liked FROM the currently displayed image
+  const currentImageLikedHexes = new Set(
+    imagePreview
+      ? likedColors.filter((l) => l.imageSrc === imagePreview).map((l) => l.hex)
+      : [],
+  );
 
   // --- Auth Effects ---
   const handleCredentialResponse = useCallback((response: any) => {
@@ -655,12 +781,60 @@ const App = () => {
 
   const handleDeleteHistoryItem = useCallback((id: number) => {
     if (!user) return;
-    
+
     setHistory(prevHistory => {
       const newHistory = prevHistory.filter(item => item.id !== id);
       return newHistory;
     });
   }, [user]);
+
+  // --- Liked Colors ---
+  useEffect(() => {
+    if (user) {
+      const saved = localStorage.getItem(`liked_${user.sub}`);
+      setLikedColors(saved ? JSON.parse(saved) : []);
+    } else {
+      setLikedColors([]);
+    }
+  }, [user]);
+
+  const handleToggleLike = useCallback(
+    (color: Color) => {
+      if (!user || !imagePreview) return;
+      setLikedColors((prev) => {
+        const existing = prev.find(
+          (l) => l.hex === color.hex && l.imageSrc === imagePreview,
+        );
+        const next = existing
+          ? prev.filter((l) => l.id !== existing.id)
+          : [
+              {
+                id: Date.now(),
+                hex: color.hex,
+                name: color.name,
+                imageSrc: imagePreview,
+                timestamp: new Date().toISOString(),
+              },
+              ...prev,
+            ];
+        localStorage.setItem(`liked_${user.sub}`, JSON.stringify(next));
+        return next;
+      });
+    },
+    [user, imagePreview],
+  );
+
+  const handleUnlike = useCallback(
+    (id: number) => {
+      if (!user) return;
+      setLikedColors((prev) => {
+        const next = prev.filter((l) => l.id !== id);
+        localStorage.setItem(`liked_${user.sub}`, JSON.stringify(next));
+        return next;
+      });
+    },
+    [user],
+  );
 
   // --- Core App Logic ---
   const handleImageUpload = useCallback(
@@ -802,7 +976,12 @@ const App = () => {
             <div class="preview-container">
               <img src=${imagePreview} alt="Uploaded image preview" />
             </div>
-            ${tieredColors && html`<${PaletteDisplay} colors=${tieredColors} />`}
+            ${tieredColors &&
+            html`<${PaletteDisplay}
+              colors=${tieredColors}
+              likedHexes=${user ? currentImageLikedHexes : undefined}
+              onToggleLike=${user ? handleToggleLike : undefined}
+            />`}
           </div>
         `}
       </div>
@@ -829,6 +1008,28 @@ const App = () => {
               `
             : html`<p class="history-empty">
                 You have no saved palettes yet. Upload an image to start!
+              </p>`}
+        </section>
+
+        <section class="liked-section">
+          <h2>❤️ Liked Colors</h2>
+          <p class="history-description">
+            Tap the heart on any color to save it here.
+          </p>
+          ${likedColors.length > 0
+            ? html`
+                <div class="liked-grid">
+                  ${likedColors.map(
+                    (item) =>
+                      html`<${LikedColorCard}
+                        item=${item}
+                        onUnlike=${handleUnlike}
+                      />`,
+                  )}
+                </div>
+              `
+            : html`<p class="history-empty">
+                No liked colors yet. Analyze an image and tap the heart on colors you love.
               </p>`}
         </section>
       `}

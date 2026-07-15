@@ -767,3 +767,109 @@ header {
     background-position: center;
     background-size: 50%;
 }
+
+/* --- Like (Heart) Button on Color Swatch --- */
+.like-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.2s ease, color 0.2s ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.like-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.like-button:hover {
+  transform: scale(1.1);
+  background-color: rgba(0, 0, 0, 0.55);
+}
+
+.like-button.liked {
+  color: var(--secondary-accent);
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.like-button.liked:hover {
+  background-color: rgba(255, 255, 255, 1);
+}
+
+/* --- Liked Colors Section --- */
+.liked-section {
+  margin-top: 3rem;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 2rem;
+  margin-bottom: 60px;
+}
+
+.liked-section h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.liked-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.liked-item-card {
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 var(--shadow-color);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.liked-item-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 32px var(--shadow-color);
+}
+
+.liked-item-thumbnail {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+}
+
+.liked-item-color {
+  height: 60px;
+  width: 100%;
+}
+
+.liked-item-info {
+  padding: 0.75rem 1rem 1rem;
+  text-align: center;
+}
+
+.liked-item-name {
+  font-weight: 500;
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem 0;
+  text-transform: capitalize;
+  color: var(--text-color);
+}
